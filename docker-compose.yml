@@ -23,16 +23,12 @@ services:
       timeout: 5s
       retries: 10
     networks:
-      - default
+      - network1
 
   mautic_web:
     build:
       context: .
       dockerfile: Dockerfile
-    links:
-      - db:mysql
-    ports:
-      - ${MAUTIC_PORT:-8001}:80
     volumes: *mautic-volumes
     environment:
       - DOCKER_MAUTIC_LOAD_TEST_DATA=${DOCKER_MAUTIC_LOAD_TEST_DATA}
@@ -48,15 +44,21 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    labels:
+        - "traefik.enable=true"
+        - "traefik.http.services.stephanepilote.loadbalancer.server.port=3000"
+        - "traefik.http.routers.stephanepilote.entrypoints=web, websecure"
+        - "traefik.http.routers.stephanepilote.rule=Host(`stephanepilote.kalura.io`)"
+        - "traefik.http.routers.stephanepilote.service=stephanepilote"
+        - "traefik.http.routers.stephanepilote.tls=true"
+        - "traefik.http.routers.stephanepilote.tls.certresolver=production"
     networks:
-      - default
+      - network1
 
   mautic_cron:
       build:
         context: .
         dockerfile: Dockerfile
-      links:
-        - db:mysql
       volumes: *mautic-volumes
       environment:
         - DOCKER_MAUTIC_ROLE=mautic_cron
@@ -66,14 +68,12 @@ services:
         mautic_web:
           condition: service_healthy
       networks:
-        - default
+        - network1
 
   mautic_worker:
     build:
       context: .
       dockerfile: Dockerfile
-    links:
-      - db:mysql
     volumes: *mautic-volumes
     environment:
       - DOCKER_MAUTIC_ROLE=mautic_worker
@@ -83,7 +83,7 @@ services:
       mautic_web:
         condition: service_healthy
     networks:
-      - default
+      - network1
     deploy:
       replicas: 1
 
@@ -93,3 +93,6 @@ volumes:
 networks:
   default:
     name: ${COMPOSE_PROJECT_NAME}-docker
+  network1:
+    name: traefik_default
+    external: true
